@@ -1,7 +1,7 @@
 CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -Wpedantic
 TARGET := http_server
-SRC := server.c
+SRC := server.c net.c http.c signals.c
 
 .PHONY: all clean
 
