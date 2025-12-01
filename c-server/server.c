@@ -10,23 +10,55 @@
 #include "net.h"
 #include "signals.h"
 
-static const char DEFAULT_BODY[] = "<script>alert('Hello world')</script>";
 enum { PORT = 8080 };
+
+static int handle_root(HttpContext *http, const HttpRequest *req) {
+    (void)req;
+    return http->create_response(http, 200, "text/html", "<script>alert('Hello world')</script>");
+}
+
+static int handle_health(HttpContext *http, const HttpRequest *req) {
+    (void)req;
+    return http->create_response(http, 200, "text/plain", "ok\n");
+}
+
+static int handle_ping(HttpContext *http, const HttpRequest *req) {
+    (void)req;
+    return http->create_response(http, 200, "text/plain", "pong\n");
+}
+
+static int handle_not_found(HttpContext *http, const HttpRequest *req) {
+    (void)req;
+    return http->create_response(http, 404, "text/plain", "not found\n");
+}
+
+static int handle_bad_request(HttpContext *http, const HttpRequest *req) {
+    (void)req;
+    return http->create_response(http, 400, "text/plain", "bad request\n");
+}
+
+static int handle_method_not_allowed(HttpContext *http, const HttpRequest *req) {
+    (void)req;
+    return http->create_response(http, 405, "text/plain", "method not allowed\n");
+}
 
 int main(void) {
     SignalOps signals = create_signal_ops();
+    HttpContext http = create_http_context();
     NetContext net = create_net_context((ServerConfig){
         .port = PORT,
         .backlog = 128,
     });
-    HttpContext http = create_http_context();
+    HttpRouter router = create_http_router();
     int status = EXIT_FAILURE;
 
     if (signals.install()) {
         goto cleanup;
     }
 
-    if(http.create_response(&http, DEFAULT_BODY)){
+    if (router.add_route(&router, "/", handle_root) ||
+        router.add_route(&router, "/health", handle_health) ||
+        router.add_route(&router, "/ping", handle_ping)) {
         goto cleanup;
     }
     
@@ -47,8 +79,31 @@ int main(void) {
             break;
         }
 
-        net.discard_request(client_fd);
-        (void)net.send_all(client_fd, http.response.data, http.response.length);
+        HttpRequest req;
+        if (http.read_request(&http, client_fd, &req)) {
+            if (handle_bad_request(&http, NULL) == 0) {
+                (void)net.send_all(client_fd, http.response.data, http.response.length);
+            }
+            close(client_fd);
+            continue;
+        }
+
+        if (strcmp(req.method, "GET") != 0) {
+            if (handle_method_not_allowed(&http, &req) == 0) {
+                (void)net.send_all(client_fd, http.response.data, http.response.length);
+            }
+            close(client_fd);
+            continue;
+        }
+
+        RouteHandler handler = router.match(&router, req.path);
+        if (handler == NULL) {
+            handler = handle_not_found;
+        }
+
+        if (handler(&http, &req) == 0) {
+            (void)net.send_all(client_fd, http.response.data, http.response.length);
+        }
         close(client_fd);
     }
 
