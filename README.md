@@ -12,10 +12,11 @@ ps -o pid,%mem,rss,vsize,command -p "$(lsof -ti :PORT)"
 
 | Server | Port | RSS | Notes |
 | --- | --- | --- | --- |
-| C | 8080 | ~1MB | 추가 런타임 없음, 네이티브 |
-| Bun | 8081 | ~24MB | JS 런타임 포함, Node.js 대비 경량 |
-| Java | 8082 | ~45MB | JVM 최소 수준, Spring Boot 대비 10배 이상 가벼움 |
+| C | 8080 | 1024KB (~1.0MB) | 추가 런타임 없음, 네이티브 |
+| Bun | 8081 | 23968KB (~24MB) | JS 런타임 포함, Node.js 대비 경량 |
+| Java | 8082 | 39328KB (~39MB) | JVM 최소 수준, Spring Boot 대비 10배 이상 가벼움 |
 | Rust | 8083 | 1184KB (~1.2MB) | 표준 라이브러리만 사용한 단일 바이너리 |
+| Zig | 8084 | 1216KB (~1.2MB) | 표준 라이브러리만 사용한 단일 바이너리 |
 
 ---
 
